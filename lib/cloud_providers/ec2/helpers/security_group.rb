@@ -20,7 +20,7 @@ module CloudProviders
                   :to_port => perm[:to_port],
                   :cidr_ip => range,
                   :ip_protocol => perm[:protocol]
-                }.flatten
+                }
               end.flatten
             else
               {
