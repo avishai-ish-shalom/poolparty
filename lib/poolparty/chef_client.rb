@@ -2,6 +2,10 @@ module PoolParty
   # Chef class bootstrapping chef-client.
   class ChefClient < Chef
     dsl_methods :server_url,:validation_token
+    default_options(
+      :version => "0.8",
+      :validation_key => "/etc/chef/validation.pem"
+    )
     
     def openid_url(url=nil)
       if url.nil?
@@ -22,14 +26,19 @@ module PoolParty
       build_tmp_dir
     end
 
+    def node_bootstrap!(remote_instance)
+      super(remote_instance)
+      json_file=write_bootstrap_json
+      remote_instance.scp :source => json_file, :destination => '/etc/chef/'
+      remote_instance.ssh "`gem env |awk '$0 ~/EXECUTABLE DIRECTORY/{print $4}'`/chef-solo -j /etc/chef/bootstrap.json -r http://s3.amazonaws.com/chef-solo/bootstrap-latest.tar.gz"
+    end
+
     private
     def after_initialized
       raise PoolPartyError.create("ChefArgumentMissing", "server_url must be specified!") unless server_url
     end
     def chef_cmd
-      return <<-CMD
-        PATH="$PATH:$GEM_BIN" chef-client -j /etc/chef/dna.json -c /etc/chef/client.rb -d -i 1800 -s 20
-      CMD
+      return "[ -x /usr/bin/svn ] && sv restart chef-client || /etc/init.d/chef-client restart"
     end
     # The NEW actual chef resolver.
     def build_tmp_dir
@@ -58,6 +67,22 @@ openid_url         "#{openid_url}"
       File.open(to, "w") do |f|
         f << content
       end
+    end
+
+    def write_bootstrap_json(to=tmp_path/"etc/chef/bootstrap.json")
+      server=URI.parse(server_url)
+      chef_hash={
+        "url_type" => server.scheme,
+        "init_style" => "runit",
+        "path" => "/var/lib/chef",
+        "cache_path" => "/var/cache/chef",
+        "client_version" => version.to_s,
+        "validation_key" => validation_key,
+        "server_fqdn" => server.host,
+        "server_port" => server.port.to_s }
+        chef_hash["validation_token"] = validation_token if validation_token
+      File.open(to,'w') {|f| f << JSON.pretty_generate("bootstrap" => { "chef" => chef_hash }, "recipes" => "bootstrap::client")}
+      return to
     end
   end
 end
