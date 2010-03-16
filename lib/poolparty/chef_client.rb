@@ -30,7 +30,7 @@ module PoolParty
       build_tmp_dir
     end
 
-    def node_bootstrap!(remote_instance)
+    def node_bootstrap(remote_instance)
       super(remote_instance)
       json_file=write_bootstrap_json
       remote_instance.scp :source => json_file, :destination => '/etc/chef/'
