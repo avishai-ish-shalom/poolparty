@@ -55,16 +55,17 @@ module PoolParty
     end
 
     def node_bootsrapped?(remote_instance)
-      remote_instance.ssh(["(gem list; dpkg -l chef) | grep -q chef && echo 'chef installed'"], :do_sudo => false).empty?
+      # "(gem list; dpkg -l chef) | grep -q chef && echo 'chef installed'"
+      remote_instance.ssh(['if [ ! -n "$(gem list 2>/dev/null | grep chef)" ]; then echo "chef installed"; fi'], :do_sudo => false).empty? rescue false
     end
-   def node_bootstrap!(remote_instance)
+   def node_bootstrap(remote_instance)
       remote_instance.ssh([
         'apt-get update',
         'apt-get autoremove -y',
         'apt-get install -y ruby ruby-dev rubygems git-core libopenssl-ruby build-essential',
         'gem sources -a http://gems.opscode.com',
         'gem install chef ohai --no-rdoc --no-ri' ])
-      remote_instance.ssh(remote_instance.bootstrap_gems.collect { |gem| "gem install #{gem} --no-rdoc --no-ri" } )
+      remote_instance.ssh(remote_instance.bootstrap_gems.collect { |g| "gem install #{g} --no-rdoc --no-ri" } )
     end
     private
     
@@ -73,7 +74,11 @@ module PoolParty
     end
 
     def method_missing(m,*args,&block)
-      cloud.send(m,*args,&block) if cloud.respond_to?(m)
+      if cloud.respond_to?(m)
+        cloud.send(m,*args,&block)
+      else
+        super
+      end
     end
     
   end
