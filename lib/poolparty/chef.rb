@@ -127,7 +127,7 @@ module PoolParty
     end
 
     def node_stop!(remote_instance)
-      remote_instance.ssh("killall -q chef-client chef-solo; [ -f /etc/init.d/chef-client ] && invoke-rc.d chef-client stop")
+      remote_instance.ssh("pkill chef; [ -f /etc/init.d/chef-client ] && invoke-rc.d chef-client stop")
     end
 
     def node_configure!(remote_instance)
@@ -139,8 +139,10 @@ module PoolParty
       # ubuntu, calling a command from package not installed
       # 'helpfully' prints message, which result confuses detection
       #
-      cmd = "which %s" % BOOTSTRAP_BINS.join(' ') +
-        " && dpkg -l %s " % BOOTSTRAP_PACKAGES.join(' ') +
+      envhash = {
+        :GEM_BIN => %q%$(gem env | grep "EXECUTABLE DIRECTORY" | awk "{print \\$4}")%
+      }
+      cmd = "PATH=$PATH:$GEM_BIN which %s" % BOOTSTRAP_BINS.join(' ') +
         BOOTSTRAP_GEMS.map{ |gem|
           "&& gem search '^#{gem}$' | grep -v GEMS | wc -l | grep -q 1"
         }.join(' ') +
@@ -150,7 +152,7 @@ module PoolParty
         (quiet ? " >/dev/null " : "" ) +
         " && echo OK || echo MISSING"
 
-      r = remote_instance.ssh(cmd, :do_sudo => false )
+      r = remote_instance.ssh(cmd, :do_sudo => false, :env => envhash )
       r.split("\n").to_a.last.chomp == "OK"
     end
 
