@@ -10,7 +10,7 @@ module PoolParty
     # we dont specifically install these binaries, they installed by
     # packages and gems above, but we check for them
     BOOTSTRAP_BINS = %w( gem chef-solo chef-client )
-    BOOTSTRAP_DIRS = %w( /var/log/chef /var/cache/chef /var/run/chef )
+    BOOTSTRAP_DIRS = %w( /var/log/chef /var/cache/chef /var/run/chef /var/backups/chef )
 
     def compile!
       build_tmp_dir
@@ -167,7 +167,7 @@ module PoolParty
         [
          'apt-get update',
          'apt-get autoremove -y',
-         'apt-get install -y %s' % BOOTSTRAP_PACKAGES.join(' '),
+         'DEBIAN_FRONTEND=noninteractive apt-get install -y %s' % BOOTSTRAP_PACKAGES.join(' '),
          "gem source -l | grep -q #{gem_src} || gem source -a #{gem_src} ",
          'gem install %s --no-rdoc --no-ri' % 
             (BOOTSTRAP_GEMS + remote_instance.bootstrap_gems).join(' '),
