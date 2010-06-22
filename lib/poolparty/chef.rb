@@ -10,7 +10,8 @@ module PoolParty
     # we dont specifically install these binaries, they installed by
     # packages and gems above, but we check for them
     BOOTSTRAP_BINS = %w( gem chef-solo chef-client )
-    BOOTSTRAP_DIRS = %w( /var/log/chef /var/cache/chef /var/run/chef /var/backups/chef )
+    BOOTSTRAP_DIRS = %w( /var/log/chef /var/cache/chef /var/run/chef /var/backups/chef)
+    dsl_methods :version
 
     def compile!
       build_tmp_dir
@@ -146,7 +147,7 @@ module PoolParty
         BOOTSTRAP_GEMS.map{ |gem|
           "&& gem search '^#{gem}$' | grep -v GEMS | wc -l | grep -q 1"
         }.join(' ') +
-        BOOTSTRAP_DIRS.map{ |dir|
+        bootstrap_dirs.map{ |dir|
           "&& [[ -d #{dir} ]] "
         }.join(' ') +
         (quiet ? " >/dev/null " : "" ) +
@@ -170,10 +171,10 @@ module PoolParty
          'DEBIAN_FRONTEND=noninteractive apt-get install -y %s' % BOOTSTRAP_PACKAGES.join(' '),
          "gem source -l | grep -q #{gem_src} || gem source -a #{gem_src} ",
          'gem install %s --no-rdoc --no-ri' % 
-            (BOOTSTRAP_GEMS + remote_instance.bootstrap_gems).join(' '),
+            (bootstrap_gems + remote_instance.bootstrap_gems).join(' '),
          "apt-get install -y %s" % BOOTSTRAP_PACKAGES.join(' '),
          "[ -d #{deb_gem_bin} ] && ln -sf #{deb_gem_bin}/* /usr/local/bin",
-         "mkdir -p %s" % BOOTSTRAP_DIRS.join(' ')
+         "mkdir -p %s" % bootstrap_dirs.join(' ')
         ]
 
       remote_instance.ssh(bootstrap_cmds)
@@ -204,6 +205,15 @@ module PoolParty
       return <<-CMD
         PATH="$PATH:$GEM_BIN" #{chef_bin} -j /etc/chef/dna.json -c /etc/chef/client.rb -d -i 1800 -s 20 #{debug}
       CMD
+    end
+    
+    def bootstrap_gems
+      return BOOTSTRAP_GEMS.merge "chef -v #{version}" if version
+      BOOTSTRAP_GEMS
+    end
+
+    def bootstrap_dirs
+      BOOTSTRAP_DIRS
     end
     
     def method_missing(m,*args,&block)
