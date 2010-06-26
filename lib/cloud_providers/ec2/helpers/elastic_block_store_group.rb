@@ -18,13 +18,17 @@ module CloudProviders
     end
     def after_initialized
       unless @volumes.size > 0 
-        filters={:size => size, :availabilityZone => availability_zones}
-        filters[:snapshotId]=snapshot_id if snapshot_id
-        @volumes=cloud.list_ec2_volumes filters
+        filters = {:size => size, :availabilityZone => availability_zones}
+        filters[:snapshotId] = snapshot_id if snapshot_id
+        @volumes = unless new_volumes_only
+          cloud.list_ec2_volumes filters
+        else
+          []
+        end
       end
     end
     def volumes(*volume_ids)
-      return @volumes if volume_ids.size==0
+      return @volumes if volume_ids.size == 0
       volume_ids.each{|volume_id| @volumes << cloud.list_ec2_volumes(:volumeId => volume_id)}
     end
     def volumes_attached_to(instanceId)
@@ -37,10 +41,12 @@ module CloudProviders
     end
     # Get a free volume from existing volumes in group or create a new one
     def get_free_volume(availability_zone)
-      free = []
-      free=free_volumes(availability_zone) unless new_volumes_only
-      if free.size>=1
-        return free[0]
+      unless new_volumes_only
+        free = []
+        free=free_volumes(availability_zone) 
+        if free.size>=1
+          return free[0]
+        end
       end
       create(availability_zone)
     end
@@ -56,15 +62,9 @@ module CloudProviders
     
     def attach(nodes)
       nodes.each{|node|
-        # Check no volumes are attached to node on device
-        skip_node=false
-        cloud.list_ec2_volumes.each{|vol| 
-          if vol.attached?(node.instance_id) and vol.device == device
-            warn "A volume is allready attached to device #{device} of instance #{node.instance_id}" 
-            skip_node = true
-          end
-        }
-        unless skip_node
+        if node_device_free?(node,device)
+          log "A volume is allready attached to device #{device} of instance #{node.instance_id}" 
+        else
           vol=get_free_volume(node.zone)
           vol.attach(node,device) 
         end
@@ -76,6 +76,15 @@ module CloudProviders
         volumes_attached_to(node.id).size=0
       end
       attach nodes_without_volume if nodes_without_volume.any?
+    end
+
+    # Check no volumes are attached to node on device
+    def node_device_free?(node, dev)
+      cloud.list_ec2_volumes.each{|vol| 
+        t = vol.attached?(node.instance_id) and vol.device == device
+        return t if t
+      }
+      return false
     end
   end
 end
