@@ -1,16 +1,10 @@
+$:.unshift(File.join(File.dirname(__FILE__), "."))
 require 'rake'
+require "bundler/gem_tasks"
 require 'rake/testtask'
-require 'rake/rdoctask'
-$: << File.dirname(__FILE__)
+require 'rdoc/task'
+
 require 'config/requirements'
-
-begin
-  require 'hanna/rdoctask'
-rescue LoadError => e
-  require "rake/rdoctask"
-end
-
-require 'config/jeweler' # setup gem configuration
 
 task :default  => [:test, :cleanup_test]
 desc "Update vendor directory and run tests"
@@ -34,12 +28,12 @@ end
 #   sh "ruby -Ilib:test #{Dir["#{File.dirname(__FILE__)}/../test/poolparty/*/*.rb"].join(" ")}"
 # end
 
-Rake::TestTask.new(:test) do |t|
-  t.test_files = FileList['test/lib/**/*_test.rb']
-  t.warning = false
-  t.verbose = false
+Rake::TestTask.new(:test) do |test|
+  test.libs << 'lib' << 'test'
+  test.pattern = 'test/**/*_test.rb'
+  test.verbose = true
 end
-
+  
 begin
   require 'rcov/rcovtask'
 
@@ -78,8 +72,6 @@ end
 
 
 namespace :gem do
-  task(:build).prerequisites.unshift :gemspec # Prepend the gemspec generation
-
   desc "Build the gem only if the tests pass"
   task :test_then_build => [:test, :build]
 
